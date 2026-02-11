@@ -1,0 +1,36 @@
+:root {
+  --bg-primary: #343541; 
+  --bg-secondary: #444654; 
+  --bg-card: #202123; 
+  --text-primary: #ececf1;
+  --text-secondary: #c5c5d2;
+  --accent-color: #10a37f; 
+  --accent-hover: #1a7f64;
+  --border-color: #565869;
+  --input-bg: #40414f;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Söhne', 'Segoe UI', Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar moderna */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #565869;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #acacbe;
+}
