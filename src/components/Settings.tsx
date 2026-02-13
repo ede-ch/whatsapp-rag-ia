@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styles from "./Settings.module.css";
 
 type SettingsResponse = {
@@ -81,6 +81,7 @@ export default function Settings() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -93,21 +94,20 @@ export default function Settings() {
         <div>
           <label className={styles.label}>OpenRouter API Key</label>
           <input
+            className={styles.input}
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder={hasApiKey ? "Já existe uma key salva (digite para substituir)" : "Cole sua key aqui"}
-            className={styles.input}
+            placeholder={hasApiKey ? "Já existe uma key salva (digite para substituir ou limpar)" : "Cole sua key aqui"}
           />
           <div className={styles.small}>
-            Status: {hasApiKey ? "configurada" : "não configurada"}{" "}
-            {updatedAt ? `• atualizado em ${updatedAt}` : ""}
+            Status: {hasApiKey ? "configurada" : "não configurada"} {updatedAt ? `• atualizado em ${updatedAt}` : ""}
           </div>
         </div>
 
         <div>
           <label className={styles.label}>Modelo</label>
-          <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} className={styles.input}>
+          <select className={styles.input} value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
             {MODEL_OPTIONS.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
@@ -119,20 +119,18 @@ export default function Settings() {
         <div>
           <label className={styles.label}>System Prompt</label>
           <textarea
+            className={styles.textarea}
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
             rows={6}
-            className={styles.textarea}
           />
         </div>
 
-        <button onClick={save} disabled={!canSave || saving} className={styles.primaryBtn}>
+        <button className={styles.primaryBtn} onClick={save} disabled={!canSave || saving}>
           {saving ? "Salvando…" : "Salvar"}
         </button>
 
-        {msg ? (
-          <div className={msg === "Salvo." ? styles.ok : styles.error}>{msg}</div>
-        ) : null}
+        {msg ? <div className={msg === "Salvo." ? styles.ok : styles.error}>{msg}</div> : null}
       </div>
     </div>
   );

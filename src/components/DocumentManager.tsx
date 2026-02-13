@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker?url";
 import styles from "./DocumentManager.module.css";
@@ -8,16 +8,6 @@ type DocRow = {
   file_name: string;
   created_at: string;
   chunk_count: number;
-};
-
-type SelectedDoc = {
-  id: string;
-  file_name: string;
-};
-
-type Props = {
-  selectedDocumentId?: string | null;
-  onSelectDocument?: (doc: SelectedDoc | null) => void;
 };
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -57,6 +47,11 @@ function formatDate(v: string) {
   }
 }
 
+type Props = {
+  selectedDocumentId?: string | null;
+  onSelectDocument?: (doc: DocRow) => void;
+};
+
 export default function DocumentManager({ selectedDocumentId = null, onSelectDocument }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [docs, setDocs] = useState<DocRow[]>([]);
@@ -79,14 +74,7 @@ export default function DocumentManager({ selectedDocumentId = null, onSelectDoc
       }
 
       const json = JSON.parse(text);
-      const arr = Array.isArray(json) ? (json as DocRow[]) : [];
-      setDocs(arr);
-
-      if (arr.length === 0) {
-        onSelectDocument?.(null);
-      } else if (selectedDocumentId && !arr.some((d) => d.id === selectedDocumentId)) {
-        onSelectDocument?.(null);
-      }
+      setDocs(Array.isArray(json) ? json : []);
     } catch (e: any) {
       setDocs([]);
       setMsg(e?.message || "Erro ao listar documentos");
@@ -112,7 +100,10 @@ export default function DocumentManager({ selectedDocumentId = null, onSelectDoc
       const resp = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: file.name, content }),
+        body: JSON.stringify({
+          fileName: file.name,
+          content,
+        }),
       });
 
       const text = await resp.text();
@@ -122,19 +113,12 @@ export default function DocumentManager({ selectedDocumentId = null, onSelectDoc
       }
 
       setMsg(text);
-
       setFile(null);
+
       const input = document.getElementById("doc-file-input") as HTMLInputElement | null;
       if (input) input.value = "";
 
       await loadDocs();
-
-      const latest = [...docs]
-        .sort((a, b) => (new Date(b.created_at).getTime() || 0) - (new Date(a.created_at).getTime() || 0))[0];
-      const byName = (prev: DocRow[]) => prev.find((d) => d.file_name === file.name);
-      const match = byName(docs);
-      if (match) onSelectDocument?.({ id: match.id, file_name: match.file_name });
-      else if (latest) onSelectDocument?.({ id: latest.id, file_name: latest.file_name });
     } catch (e: any) {
       setMsg(e?.message || "Erro no upload");
     } finally {
@@ -159,11 +143,6 @@ export default function DocumentManager({ selectedDocumentId = null, onSelectDoc
       }
 
       setMsg(text);
-
-      if (selectedDocumentId === id) {
-        onSelectDocument?.(null);
-      }
-
       await loadDocs();
     } catch (e: any) {
       setMsg(e?.message || "Erro ao deletar");
@@ -172,12 +151,9 @@ export default function DocumentManager({ selectedDocumentId = null, onSelectDoc
     }
   }
 
-  function selectDoc(d: DocRow) {
-    onSelectDocument?.({ id: d.id, file_name: d.file_name });
-  }
-
   useEffect(() => {
     loadDocs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -223,13 +199,14 @@ export default function DocumentManager({ selectedDocumentId = null, onSelectDoc
         <div className={styles.list}>
           {docs.map((d) => {
             const isSelected = selectedDocumentId === d.id;
+
             return (
               <button
                 key={d.id}
                 type="button"
                 className={`${styles.card} ${isSelected ? styles.cardSelected : ""}`}
-                onClick={() => selectDoc(d)}
-                disabled={busy}
+                onClick={() => onSelectDocument?.(d)}
+                title="Selecionar documento"
               >
                 <div className={styles.cardTop}>
                   <div className={styles.cardInfo}>
@@ -243,17 +220,16 @@ export default function DocumentManager({ selectedDocumentId = null, onSelectDoc
                   </div>
 
                   <span
-                    className={styles.dangerBtn}
+                    className={styles.deleteWrap}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       handleDelete(d.id);
                     }}
-                    role="button"
-                    aria-disabled={busy}
-                    tabIndex={0}
                   >
-                    Deletar
+                    <button type="button" disabled={busy} className={styles.dangerBtn}>
+                      Deletar
+                    </button>
                   </span>
                 </div>
               </button>

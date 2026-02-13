@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styles from "./ChatTester.module.css";
 
 type MsgRow = {
@@ -68,15 +68,11 @@ export default function ChatTester({ selectedDocumentId = null }: Props) {
         if (!resp.ok) throw new Error(json?.error || "Falha ao salvar msg do usuário");
       }
 
-      const ragPayload: any = { message: userText };
-      if (selectedDocumentId) ragPayload.documentId = selectedDocumentId;
-
       const ragResp = await fetch("/api/rag", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(ragPayload),
+        body: JSON.stringify({ message: userText, documentId: selectedDocumentId }),
       });
-
       const ragJson = await ragResp.json();
       if (!ragResp.ok) throw new Error(ragJson?.error || "Falha no chat RAG");
 
@@ -124,6 +120,7 @@ export default function ChatTester({ selectedDocumentId = null }: Props) {
         setMsg(e?.message || "Erro ao iniciar");
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -137,12 +134,6 @@ export default function ChatTester({ selectedDocumentId = null }: Props) {
 
       <div className={styles.meta}>
         conversationId: <b>{conversationId || "-"}</b>
-        {selectedDocumentId ? (
-          <>
-            {" "}
-            • doc: <b>{selectedDocumentId}</b>
-          </>
-        ) : null}
       </div>
 
       <div className={styles.chatBox}>
