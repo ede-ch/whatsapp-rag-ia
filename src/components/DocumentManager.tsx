@@ -1,164 +1,260 @@
-import { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useEffect, useMemo, useState } from "react";
+import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker?url";
+
+type DocRow = {
+  id: string;
+  file_name: string;
+  created_at: string;
+  chunk_count: number;
+};
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
+async function extractPdfText(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+
+  const loadingTask = pdfjsLib.getDocument({
+    data: arrayBuffer,
+    useSystemFonts: true,
+  });
+
+  const pdf = await loadingTask.promise;
+
+  let fullText = "";
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const textContent = await page.getTextContent();
+
+    const pageText = (textContent.items as any[])
+      .map((it) => (typeof it?.str === "string" ? it.str : ""))
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (pageText) fullText += (fullText ? "\n\n" : "") + pageText;
+  }
+
+  return fullText.trim();
+}
+
+function formatDate(v: string) {
+  try {
+    return new Date(v).toLocaleString();
+  } catch {
+    return v;
+  }
+}
 
 export default function DocumentManager() {
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [fileName, setFileName] = useState("");
-  const [content, setContent] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [docs, setDocs] = useState<DocRow[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string>("");
 
-  const fetchDocuments = async () => {
+  const canUpload = useMemo(() => !!file && !busy, [file, busy]);
+
+  async function loadDocs() {
+    setBusy(true);
+    setMsg("");
     try {
-      const { data } = await axios.get("/api/documents");
-      setDocuments(data);
-    } catch (error) {
-      console.error("Erro ao buscar documentos:", error);
+      const resp = await fetch("/api/documents", { method: "GET" });
+      const text = await resp.text();
+
+      if (!resp.ok) {
+        setDocs([]);
+        setMsg(text || "Falha ao listar documentos");
+        return;
+      }
+
+      const json = JSON.parse(text);
+      setDocs(Array.isArray(json) ? json : []);
+    } catch (e: any) {
+      setDocs([]);
+      setMsg(e?.message || "Erro ao listar documentos");
+    } finally {
+      setBusy(false);
     }
-  };
+  }
 
-  useEffect(() => { fetchDocuments(); }, []);
-
-  // Função simplificada para ler APENAS .txt
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  async function handleUpload() {
     if (!file) return;
 
-    // Validação simples de extensão
-    if (!file.name.endsWith(".txt")) {
-      alert("Por favor, carregue apenas arquivos .txt");
-      e.target.value = ""; // Limpa o input
-      return;
-    }
+    setBusy(true);
+    setMsg("");
 
-    setFileName(file.name);
-    
     try {
-      const text = await file.text();
-      setContent(text);
-    } catch (err) {
-      alert("Erro ao ler o ficheiro.");
-      console.error(err);
-    }
-  };
+      const content = await extractPdfText(file);
 
-  const upload = async () => {
-    if (!content || !fileName) {
-      alert("Selecione um ficheiro ou escreva o conteúdo.");
-      return;
-    }
+      if (!content) {
+        setMsg(
+          "PDF sem texto extraível. Provavelmente é PDF escaneado (imagem). Sem OCR, não dá pra indexar."
+        );
+        return;
+      }
 
-    setIsUploading(true);
-    try {
-      await axios.post("/api/upload", { fileName, content });
-      
-      // Limpa os campos após sucesso
-      setFileName(""); 
-      setContent(""); 
-      
-      // Atualiza a lista
-      fetchDocuments();
-      alert("Documento salvo com sucesso!");
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao salvar no banco de dados.");
+      const resp = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          content,
+        }),
+      });
+
+      const text = await resp.text();
+      if (!resp.ok) {
+        setMsg(text || "Falha no upload");
+        return;
+      }
+
+      setMsg(text);
+      setFile(null);
+      const input = document.getElementById("doc-file-input") as HTMLInputElement | null;
+      if (input) input.value = "";
+
+      await loadDocs();
+    } catch (e: any) {
+      setMsg(e?.message || "Erro no upload");
     } finally {
-      setIsUploading(false);
+      setBusy(false);
     }
-  };
+  }
 
-  const remove = async (id: string) => {
-    if (!confirm("Tem a certeza que deseja excluir este documento?")) return;
+  async function handleDelete(id: string) {
+    setBusy(true);
+    setMsg("");
     try {
-      await axios.delete("/api/documents", { data: { id } });
-      fetchDocuments();
-    } catch (error) {
-      console.error("Erro ao deletar:", error);
+      const resp = await fetch("/api/documents", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      const text = await resp.text();
+      if (!resp.ok) {
+        setMsg(text || "Falha ao deletar");
+        return;
+      }
+
+      setMsg(text);
+      await loadDocs();
+    } catch (e: any) {
+      setMsg(e?.message || "Erro ao deletar");
+    } finally {
+      setBusy(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    loadDocs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <div>
-      <h2>Gestor de Documentos (TXT)</h2>
-      
-      <div style={{ 
-        background: "#f5f5f5", 
-        padding: "15px", 
-        borderRadius: "8px", 
-        marginBottom: "20px",
-        border: "1px solid #ddd" 
-      }}>
-        <label style={{ display: "block", marginBottom: "8px", fontWeight: "bold" }}>
-          1. Escolha o arquivo .txt:
-        </label>
-        <input 
-          type="file" 
-          accept=".txt" 
-          onChange={handleFileUpload} 
-          style={{ marginBottom: "15px", display: "block" }}
-        />
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ fontWeight: 900 }}>Documentos (RAG)</div>
 
-        <label style={{ display: "block", marginBottom: "5px" }}>Nome do Arquivo:</label>
-        <input 
-          placeholder="Ex: manual_empresa.txt" 
-          value={fileName} 
-          onChange={e=>setFileName(e.target.value)} 
-          style={{ width: "100%", padding: "8px", marginBottom: "10px", boxSizing: "border-box" }}
-        />
-        
-        <label style={{ display: "block", marginBottom: "5px" }}>Conteúdo (Pré-visualização):</label>
-        <textarea 
-          placeholder="O conteúdo do arquivo aparecerá aqui..." 
-          value={content} 
-          onChange={e=>setContent(e.target.value)} 
-          rows={6}
-          style={{ width: "100%", padding: "8px", marginBottom: "10px", boxSizing: "border-box", fontFamily: "monospace" }} 
-        />
-        
-        <button 
-          onClick={upload} 
-          disabled={isUploading}
-          style={{ 
-            backgroundColor: isUploading ? "#ccc" : "#1a73e8",
-            color: "white",
-            border: "none",
-            padding: "10px 20px",
-            borderRadius: "5px",
-            cursor: isUploading ? "not-allowed" : "pointer"
-          }}
-        >
-          {isUploading ? "Enviando..." : "Salvar no Banco de Conhecimento"}
-        </button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <input
+            id="doc-file-input"
+            type="file"
+            accept="application/pdf"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
+          <button onClick={handleUpload} disabled={!canUpload} style={styles.btn}>
+            {busy ? "Processando..." : "Enviar"}
+          </button>
+        </div>
+
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.35 }}>
+          PDF é extraído no navegador e enviado como texto para a API.
+          <br />
+          PDF escaneado (imagem) não funciona sem OCR.
+        </div>
+
+        {msg ? (
+          <pre style={styles.log}>
+            {msg}
+          </pre>
+        ) : null}
       </div>
 
-      <h3>Documentos Disponíveis na Base:</h3>
-      {documents.length === 0 ? <p style={{ color: "#777" }}>Nenhum documento cadastrado.</p> : (
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {documents.map(d => (
-            <li key={d.id} style={{ 
-              padding: "10px", 
-              borderBottom: "1px solid #eee", 
-              display: "flex", 
-              justifyContent: "space-between",
-              alignItems: "center"
-            }}>
-              <span>📄 {d.file_name}</span> 
-              <button 
-                onClick={()=>remove(d.id)} 
-                style={{ 
-                  background: "#ff4d4d", 
-                  color: "white", 
-                  border: "none", 
-                  borderRadius: "4px", 
-                  padding: "5px 10px",
-                  cursor: "pointer"
-                }}
-              >
-                Excluir
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontWeight: 900 }}>Lista</div>
+          <button onClick={loadDocs} disabled={busy} style={styles.btn}>
+            Atualizar
+          </button>
+        </div>
+
+        {docs.length === 0 ? (
+          <div style={{ marginTop: 10, color: "rgba(255,255,255,0.75)" }}>Nenhum documento.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+            {docs.map((d) => (
+              <div key={d.id} style={styles.card}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {d.file_name}
+                    </div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
+                      {formatDate(d.created_at)} • chunks: {d.chunk_count}
+                    </div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{d.id}</div>
+                  </div>
+
+                  <button onClick={() => handleDelete(d.id)} disabled={busy} style={styles.dangerBtn}>
+                    Deletar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  btn: {
+    padding: "8px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(79,140,255,0.7)",
+    background: "rgba(79,140,255,0.15)",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  dangerBtn: {
+    padding: "8px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,90,90,0.6)",
+    background: "rgba(255,90,90,0.12)",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+    height: 38,
+    alignSelf: "flex-start",
+  },
+  card: {
+    borderRadius: 14,
+    border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(255,255,255,0.03)",
+    padding: 12,
+  },
+  log: {
+    margin: 0,
+    marginTop: 6,
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    background: "rgba(0,0,0,0.25)",
+    padding: 10,
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.08)",
+    fontSize: 12,
+  },
+};

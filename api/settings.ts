@@ -7,6 +7,10 @@ function getEnv(name: string) {
   return v;
 }
 
+function toIsoNow() {
+  return new Date().toISOString();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const supabase = createClient(
@@ -27,31 +31,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         selectedModel: data?.selected_model || "openai/gpt-4o-mini",
         systemPrompt: data?.system_prompt || "Você é um assistente útil.",
         hasApiKey: Boolean(data?.openrouter_api_key && data.openrouter_api_key.length > 0),
-        updatedAt: data?.updated_at,
+        updatedAt: data?.updated_at || null,
       });
     }
 
     if (req.method === "PUT") {
       const { apiKey, selectedModel, systemPrompt } = req.body || {};
 
-      if (typeof selectedModel !== "string" || typeof systemPrompt !== "string") {
-        return res.status(400).json({ error: "selectedModel e systemPrompt são obrigatórios" });
+      if (typeof selectedModel !== "string" || selectedModel.trim().length === 0) {
+        return res.status(400).json({ error: "selectedModel é obrigatório" });
+      }
+
+      if (typeof systemPrompt !== "string" || systemPrompt.trim().length === 0) {
+        return res.status(400).json({ error: "systemPrompt é obrigatório" });
       }
 
       const payload: any = {
-        selected_model: selectedModel,
+        id: 1,
+        selected_model: selectedModel.trim(),
         system_prompt: systemPrompt,
-        updated_at: new Date().toISOString(),
+        updated_at: toIsoNow(),
       };
 
-      if (typeof apiKey === "string" && apiKey.trim().length > 0) {
-        payload.openrouter_api_key = apiKey.trim();
-      }
+      if (typeof apiKey === "string") payload.openrouter_api_key = apiKey.trim();
 
-      const { error } = await supabase
-        .from("settings")
-        .upsert({ id: 1, ...payload }, { onConflict: "id" });
-
+      const { error } = await supabase.from("settings").upsert(payload, { onConflict: "id" });
       if (error) return res.status(500).json({ error: error.message });
 
       return res.status(200).json({ success: true });

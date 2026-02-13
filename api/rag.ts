@@ -110,13 +110,6 @@ async function createEmbedding(openRouterKey: string, text: string) {
   return emb as number[];
 }
 
-function similarityMinFromEnv() {
-  const raw = process.env.SIMILARITY_MIN;
-  if (!raw) return 0.2;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : 0.2;
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido" });
@@ -158,30 +151,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (rpcError) return res.status(500).json({ error: `RPC match_chunks falhou: ${rpcError.message}` });
 
-    const SIM_MIN = similarityMinFromEnv();
+    const SIMILARITY_MIN = 0.2;
 
-    const docsForContext: Array<{ file_name: string; content: string; similarity: number }> =
-      (chunks || [])
-        .map((c: any) => ({
-          file_name: c.file_name || "documento",
-          content: c.content || "",
-          similarity: typeof c.similarity === "number" ? c.similarity : 0,
-        }))
-        .filter((c: any) => c.content && c.similarity >= SIM_MIN);
+    type ChunkResult = {
+  file_name: string | null;
+  content: string | null;
+  similarity: number | null;
+};
+
+const rawChunks = (chunks || []) as ChunkResult[];
+
+const docsForContext = rawChunks
+  .map((c) => ({
+    file_name: c.file_name ?? "documento",
+    content: c.content ?? "",
+    similarity: typeof c.similarity === "number" ? c.similarity : 0,
+  }))
+  .filter((c) => c.content.trim().length > 0)
+  .filter((c) => c.similarity >= SIMILARITY_MIN);
 
     const uniqueSourceNames = Array.from(new Set(docsForContext.map((d) => d.file_name).filter(Boolean)));
+    const limitedSources = uniqueSourceNames.slice(0, 2);
+    const sourcesLine = limitedSources.length ? `\n\nFontes: ${limitedSources.join(", ")}` : "";
 
-    if (!docsForContext.length) {
-      return res.status(200).json({
-        reply: "Não encontrei essa informação nos documentos carregados.",
-        usedModel: modelFinal,
-        fallbackUsed: false,
-      });
-    }
-
-    const context = docsForContext
-      .map((d, idx) => `### Trecho ${idx + 1} — Documento: ${d.file_name} (similarity=${d.similarity.toFixed(3)})\n${d.content}`)
-      .join("\n\n---\n\n");
+    const context =
+      docsForContext.length > 0
+        ? docsForContext
+            .map(
+              (d, idx) =>
+                `### Trecho ${idx + 1} — Documento: ${d.file_name} (similaridade: ${d.similarity.toFixed(3)})\n${
+                  d.content
+                }`
+            )
+            .join("\n\n---\n\n")
+        : "Sem contexto disponível.";
 
     const forcedContext = `
 Você TEM acesso ao banco interno de documentos (trechos relevantes já fornecidos abaixo).
@@ -202,8 +205,6 @@ ${context}
         { role: "user", content: userMessage },
       ],
     });
-
-    const sourcesLine = uniqueSourceNames.length ? `\n\nFontes: ${uniqueSourceNames.join(", ")}` : "";
 
     return res.status(200).json({ reply: reply + sourcesLine, usedModel, fallbackUsed });
   } catch (err: any) {
