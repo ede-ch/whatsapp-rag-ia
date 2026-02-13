@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import styles from "./ChatTester.module.css";
 
 type MsgRow = {
   id: string;
@@ -8,7 +9,11 @@ type MsgRow = {
   created_at: string;
 };
 
-export default function ChatTester() {
+type Props = {
+  selectedDocumentId?: string | null;
+};
+
+export default function ChatTester({ selectedDocumentId = null }: Props) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MsgRow[]>([]);
   const [text, setText] = useState("");
@@ -53,7 +58,6 @@ export default function ChatTester() {
       const id = await ensureConversation();
       const userText = text.trim();
 
-      // salva msg do usuário
       {
         const resp = await fetch("/api/messages", {
           method: "POST",
@@ -64,18 +68,20 @@ export default function ChatTester() {
         if (!resp.ok) throw new Error(json?.error || "Falha ao salvar msg do usuário");
       }
 
-      // chama RAG
+      const ragPayload: any = { message: userText };
+      if (selectedDocumentId) ragPayload.documentId = selectedDocumentId;
+
       const ragResp = await fetch("/api/rag", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText }),
+        body: JSON.stringify(ragPayload),
       });
+
       const ragJson = await ragResp.json();
       if (!ragResp.ok) throw new Error(ragJson?.error || "Falha no chat RAG");
 
       const reply = String(ragJson.reply || "").trim();
 
-      // salva resposta do assistente
       {
         const resp = await fetch("/api/messages", {
           method: "POST",
@@ -110,7 +116,6 @@ export default function ChatTester() {
   }
 
   useEffect(() => {
-    // cria uma conversa ao abrir, pra já ter histórico
     (async () => {
       try {
         const id = await createConversation();
@@ -122,50 +127,34 @@ export default function ChatTester() {
   }, []);
 
   return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
-        <h2 style={{ marginTop: 0 }}>Chat de teste (RAG) + Histórico</h2>
-        <button
-          onClick={newChat}
-          disabled={loading}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 10,
-            border: "1px solid #007AFF",
-            background: loading ? "#eee" : "white",
-            color: "#007AFF",
-            fontWeight: 700,
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <h2 className={styles.title}>Chat</h2>
+        <button className={styles.secondaryBtn} onClick={newChat} disabled={loading}>
           Novo chat
         </button>
       </div>
 
-      <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
+      <div className={styles.meta}>
         conversationId: <b>{conversationId || "-"}</b>
+        {selectedDocumentId ? (
+          <>
+            {" "}
+            • doc: <b>{selectedDocumentId}</b>
+          </>
+        ) : null}
       </div>
 
-      <div
-        style={{
-          background: "#fafafa",
-          border: "1px solid #eee",
-          borderRadius: 12,
-          padding: 12,
-          height: 260,
-          overflow: "auto",
-          whiteSpace: "pre-wrap",
-        }}
-      >
+      <div className={styles.chatBox}>
         {messages.length === 0 ? (
-          <div style={{ color: "#777" }}>Sem mensagens ainda.</div>
+          <div className={styles.empty}>Sem mensagens ainda.</div>
         ) : (
           messages.map((m) => (
-            <div key={m.id} style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: "#555" }}>
-                <b>{m.role}</b> • {new Date(m.created_at).toLocaleString()}
+            <div key={m.id} className={styles.msgCard}>
+              <div className={styles.msgMeta}>
+                <b className={styles.role}>{m.role}</b> • {new Date(m.created_at).toLocaleString()}
               </div>
-              <div>{m.content}</div>
+              <div className={styles.msgContent}>{m.content}</div>
             </div>
           ))
         )}
@@ -175,32 +164,15 @@ export default function ChatTester() {
         rows={3}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ccc", marginTop: 10 }}
+        className={styles.textarea}
         placeholder="Digite sua mensagem…"
       />
 
-      <button
-        onClick={send}
-        disabled={!canSend}
-        style={{
-          marginTop: 10,
-          padding: "10px 14px",
-          borderRadius: 10,
-          border: "1px solid #007AFF",
-          background: !canSend ? "#eee" : "white",
-          color: "#007AFF",
-          fontWeight: 700,
-          cursor: !canSend ? "not-allowed" : "pointer",
-        }}
-      >
+      <button className={styles.primaryBtn} onClick={send} disabled={!canSend}>
         {loading ? "Enviando…" : "Enviar"}
       </button>
 
-      {msg ? (
-        <div style={{ fontSize: 13, marginTop: 10, color: "#b00020" }}>
-          {msg}
-        </div>
-      ) : null}
+      {msg ? <div className={styles.error}>{msg}</div> : null}
     </div>
   );
 }

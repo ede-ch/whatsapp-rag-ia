@@ -1,0 +1,79 @@
+.container {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 14px;
+}
+
+.title {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.info {
+  margin: 0 0 10px 0;
+  opacity: 0.8;
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+}
+
+.label {
+  display: block;
+  font-weight: 800;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.small {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.25);
+  color: white;
+}
+
+.textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.25);
+  color: white;
+  resize: vertical;
+}
+
+.primaryBtn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(79, 140, 255, 0.7);
+  background: rgba(79, 140, 255, 0.15);
+  color: white;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ok {
+  font-size: 13px;
+  color: #5cff9b;
+}
+
+.error {
+  font-size: 13px;
+  color: #ff6b6b;
+}

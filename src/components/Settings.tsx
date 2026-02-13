@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import styles from "./Settings.module.css";
 
 type SettingsResponse = {
   selectedModel: string;
@@ -26,7 +27,10 @@ export default function Settings() {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
   const [msg, setMsg] = useState<string | null>(null);
-  const canSave = useMemo(() => selectedModel.trim().length > 0 && systemPrompt.trim().length > 0, [selectedModel, systemPrompt]);
+  const canSave = useMemo(
+    () => selectedModel.trim().length > 0 && systemPrompt.trim().length > 0,
+    [selectedModel, systemPrompt]
+  );
 
   async function load() {
     setLoading(true);
@@ -75,36 +79,35 @@ export default function Settings() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
-      <h2 style={{ marginTop: 0 }}>Configurações</h2>
+    <div className={styles.container}>
+      <h2 className={styles.title}>Configurações</h2>
 
-      {loading ? <p>Carregando…</p> : null}
+      {loading ? <p className={styles.info}>Carregando…</p> : null}
 
-      <div style={{ display: "grid", gap: 12 }}>
+      <div className={styles.grid}>
         <div>
-          <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>OpenRouter API Key</label>
+          <label className={styles.label}>OpenRouter API Key</label>
           <input
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder={hasApiKey ? "Já existe uma key salva (digite para substituir ou limpar)" : "Cole sua key aqui"}
-            style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+            placeholder={hasApiKey ? "Já existe uma key salva (digite para substituir)" : "Cole sua key aqui"}
+            className={styles.input}
           />
-          <div style={{ marginTop: 6, fontSize: 12, color: "#555" }}>
-            Status: {hasApiKey ? "configurada" : "não configurada"} {updatedAt ? `• atualizado em ${updatedAt}` : ""}
+          <div className={styles.small}>
+            Status: {hasApiKey ? "configurada" : "não configurada"}{" "}
+            {updatedAt ? `• atualizado em ${updatedAt}` : ""}
           </div>
         </div>
 
         <div>
-          <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>Modelo</label>
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
-          >
+          <label className={styles.label}>Modelo</label>
+          <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} className={styles.input}>
             {MODEL_OPTIONS.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
@@ -114,32 +117,22 @@ export default function Settings() {
         </div>
 
         <div>
-          <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>System Prompt</label>
+          <label className={styles.label}>System Prompt</label>
           <textarea
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
             rows={6}
-            style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ccc", resize: "vertical" }}
+            className={styles.textarea}
           />
         </div>
 
-        <button
-          onClick={save}
-          disabled={!canSave || saving}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "1px solid #007AFF",
-            background: saving ? "#eee" : "white",
-            color: "#007AFF",
-            fontWeight: 700,
-            cursor: saving ? "not-allowed" : "pointer",
-          }}
-        >
+        <button onClick={save} disabled={!canSave || saving} className={styles.primaryBtn}>
           {saving ? "Salvando…" : "Salvar"}
         </button>
 
-        {msg ? <div style={{ fontSize: 13, color: msg === "Salvo." ? "green" : "#b00020" }}>{msg}</div> : null}
+        {msg ? (
+          <div className={msg === "Salvo." ? styles.ok : styles.error}>{msg}</div>
+        ) : null}
       </div>
     </div>
   );

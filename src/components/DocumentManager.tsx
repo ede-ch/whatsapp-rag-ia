@@ -1,12 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker?url";
+import styles from "./DocumentManager.module.css";
 
 type DocRow = {
   id: string;
   file_name: string;
   created_at: string;
   chunk_count: number;
+};
+
+type SelectedDoc = {
+  id: string;
+  file_name: string;
+};
+
+type Props = {
+  selectedDocumentId?: string | null;
+  onSelectDocument?: (doc: SelectedDoc | null) => void;
 };
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -46,7 +57,7 @@ function formatDate(v: string) {
   }
 }
 
-export default function DocumentManager() {
+export default function DocumentManager({ selectedDocumentId = null, onSelectDocument }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [busy, setBusy] = useState(false);
@@ -68,7 +79,14 @@ export default function DocumentManager() {
       }
 
       const json = JSON.parse(text);
-      setDocs(Array.isArray(json) ? json : []);
+      const arr = Array.isArray(json) ? (json as DocRow[]) : [];
+      setDocs(arr);
+
+      if (arr.length === 0) {
+        onSelectDocument?.(null);
+      } else if (selectedDocumentId && !arr.some((d) => d.id === selectedDocumentId)) {
+        onSelectDocument?.(null);
+      }
     } catch (e: any) {
       setDocs([]);
       setMsg(e?.message || "Erro ao listar documentos");
@@ -87,19 +105,14 @@ export default function DocumentManager() {
       const content = await extractPdfText(file);
 
       if (!content) {
-        setMsg(
-          "PDF sem texto extraível. Provavelmente é PDF escaneado (imagem). Sem OCR, não dá pra indexar."
-        );
+        setMsg("PDF sem texto extraível. Provavelmente é PDF escaneado (imagem). Sem OCR, não dá pra indexar.");
         return;
       }
 
       const resp = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileName: file.name,
-          content,
-        }),
+        body: JSON.stringify({ fileName: file.name, content }),
       });
 
       const text = await resp.text();
@@ -109,11 +122,19 @@ export default function DocumentManager() {
       }
 
       setMsg(text);
+
       setFile(null);
       const input = document.getElementById("doc-file-input") as HTMLInputElement | null;
       if (input) input.value = "";
 
       await loadDocs();
+
+      const latest = [...docs]
+        .sort((a, b) => (new Date(b.created_at).getTime() || 0) - (new Date(a.created_at).getTime() || 0))[0];
+      const byName = (prev: DocRow[]) => prev.find((d) => d.file_name === file.name);
+      const match = byName(docs);
+      if (match) onSelectDocument?.({ id: match.id, file_name: match.file_name });
+      else if (latest) onSelectDocument?.({ id: latest.id, file_name: latest.file_name });
     } catch (e: any) {
       setMsg(e?.message || "Erro no upload");
     } finally {
@@ -138,6 +159,11 @@ export default function DocumentManager() {
       }
 
       setMsg(text);
+
+      if (selectedDocumentId === id) {
+        onSelectDocument?.(null);
+      }
+
       await loadDocs();
     } catch (e: any) {
       setMsg(e?.message || "Erro ao deletar");
@@ -146,115 +172,95 @@ export default function DocumentManager() {
     }
   }
 
+  function selectDoc(d: DocRow) {
+    onSelectDocument?.({ id: d.id, file_name: d.file_name });
+  }
+
   useEffect(() => {
     loadDocs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ fontWeight: 900 }}>Documentos (RAG)</div>
+    <div className={styles.container}>
+      <div className={styles.uploadArea}>
+        <div className={styles.sectionTitle}>Documentos (RAG)</div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div className={styles.row}>
           <input
             id="doc-file-input"
             type="file"
             accept="application/pdf"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className={styles.fileInput}
           />
-          <button onClick={handleUpload} disabled={!canUpload} style={styles.btn}>
+
+          <button className={styles.btn} onClick={handleUpload} disabled={!canUpload}>
             {busy ? "Processando..." : "Enviar"}
           </button>
         </div>
 
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.35 }}>
+        <div className={styles.hint}>
           PDF é extraído no navegador e enviado como texto para a API.
           <br />
           PDF escaneado (imagem) não funciona sem OCR.
         </div>
 
-        {msg ? (
-          <pre style={styles.log}>
-            {msg}
-          </pre>
-        ) : null}
+        {msg ? <pre className={styles.log}>{msg}</pre> : null}
       </div>
 
-      <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontWeight: 900 }}>Lista</div>
-          <button onClick={loadDocs} disabled={busy} style={styles.btn}>
-            Atualizar
-          </button>
-        </div>
+      <div className={styles.divider} />
 
-        {docs.length === 0 ? (
-          <div style={{ marginTop: 10, color: "rgba(255,255,255,0.75)" }}>Nenhum documento.</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-            {docs.map((d) => (
-              <div key={d.id} style={styles.card}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis" }}>
+      <div className={styles.listHeader}>
+        <div className={styles.sectionTitle}>Lista</div>
+        <button onClick={loadDocs} disabled={busy} className={styles.btn}>
+          Atualizar
+        </button>
+      </div>
+
+      {docs.length === 0 ? (
+        <div className={styles.empty}>Nenhum documento.</div>
+      ) : (
+        <div className={styles.list}>
+          {docs.map((d) => {
+            const isSelected = selectedDocumentId === d.id;
+            return (
+              <button
+                key={d.id}
+                type="button"
+                className={`${styles.card} ${isSelected ? styles.cardSelected : ""}`}
+                onClick={() => selectDoc(d)}
+                disabled={busy}
+              >
+                <div className={styles.cardTop}>
+                  <div className={styles.cardInfo}>
+                    <div className={styles.fileName} title={d.file_name}>
                       {d.file_name}
                     </div>
-                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
+                    <div className={styles.meta}>
                       {formatDate(d.created_at)} • chunks: {d.chunk_count}
                     </div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{d.id}</div>
+                    <div className={styles.idText}>{d.id}</div>
                   </div>
 
-                  <button onClick={() => handleDelete(d.id)} disabled={busy} style={styles.dangerBtn}>
+                  <span
+                    className={styles.dangerBtn}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDelete(d.id);
+                    }}
+                    role="button"
+                    aria-disabled={busy}
+                    tabIndex={0}
+                  >
                     Deletar
-                  </button>
+                  </span>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  btn: {
-    padding: "8px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(79,140,255,0.7)",
-    background: "rgba(79,140,255,0.15)",
-    color: "white",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  dangerBtn: {
-    padding: "8px 12px",
-    borderRadius: 12,
-    border: "1px solid rgba(255,90,90,0.6)",
-    background: "rgba(255,90,90,0.12)",
-    color: "white",
-    fontWeight: 900,
-    cursor: "pointer",
-    height: 38,
-    alignSelf: "flex-start",
-  },
-  card: {
-    borderRadius: 14,
-    border: "1px solid rgba(255,255,255,0.08)",
-    background: "rgba(255,255,255,0.03)",
-    padding: 12,
-  },
-  log: {
-    margin: 0,
-    marginTop: 6,
-    whiteSpace: "pre-wrap",
-    wordBreak: "break-word",
-    background: "rgba(0,0,0,0.25)",
-    padding: 10,
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.08)",
-    fontSize: 12,
-  },
-};

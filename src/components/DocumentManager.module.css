@@ -1,0 +1,182 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.uploadArea {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sectionTitle {
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.fileInput {
+  width: 100%;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.fileInput::file-selector-button {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  font-weight: 700;
+  margin-right: 10px;
+}
+
+.btn {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(79, 140, 255, 0.55);
+  background: rgba(79, 140, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 120ms ease, filter 120ms ease, border-color 120ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(79, 140, 255, 0.85);
+  filter: brightness(1.05);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 12px;
+  opacity: 0.78;
+  line-height: 1.35;
+}
+
+.log {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+}
+
+.divider {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 6px;
+}
+
+.listHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.empty {
+  margin-top: 10px;
+  opacity: 0.78;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  text-align: left;
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.92);
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.card:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(79, 140, 255, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.card:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.cardSelected {
+  border-color: rgba(79, 140, 255, 0.65);
+  background: rgba(79, 140, 255, 0.10);
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.cardInfo {
+  min-width: 0;
+}
+
+.fileName {
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  font-size: 12px;
+  opacity: 0.78;
+  margin-top: 2px;
+}
+
+.idText {
+  font-size: 11px;
+  opacity: 0.58;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+.dangerBtn {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 90, 90, 0.55);
+  background: rgba(255, 90, 90, 0.12);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 800;
+  cursor: pointer;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+}
+
+.dangerBtn[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
